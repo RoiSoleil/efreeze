@@ -1,0 +1,76 @@
+name: build
+on:
+   push:
+      branches:
+      - main
+   pull_request:
+permissions:
+   contents: write
+jobs:
+   build:
+      runs-on: ubuntu-latest
+      steps:
+      -  name: Checkout
+         uses: actions/checkout@v7
+      -  name: Set up JDK
+         uses: actions/setup-java@v6
+         with:
+            distribution: temurin
+            java-version: 21
+      -  name: Setup Maven
+         uses: stCarolas/setup-maven@v5
+         with:
+           maven-version: 3.9.16
+      -  name: Set up cache
+         uses: actions/cache@v6.1.0
+         with:
+           path: ~/.m2/repository
+           key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
+           restore-keys: |
+             ${{ runner.os }}-maven-
+      -  name: Build
+         # The tests freeze the UI thread of a real workbench: they need a display.
+         run: xvfb-run -a mvn -B clean install
+      -  name: Upload coverage to Codecov
+         if: always()
+         uses: codecov/codecov-action@v7
+         with:
+            files: tests/org.eclipse.efreeze.coverage/target/site/jacoco-aggregate/jacoco.xml
+            token: ${{ secrets.CODECOV_TOKEN }}
+      -  name: Upload the test reports
+         if: failure()
+         uses: actions/upload-artifact@v7
+         with:
+            name: surefire-reports
+            path: tests/org.eclipse.efreeze.tests/target/surefire-reports
+      -  name: Release
+         if: github.event_name == 'push'
+         env:
+            GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         run: |
+            gh release delete latest --yes --cleanup-tag || true
+            gh release create latest --prerelease --title "Development Build" --target "$GITHUB_SHA" \
+               --notes "Latest build of the main branch." \
+               update-site/org.eclipse.efreeze/target/org.eclipse.efreeze.updatesite-*-SNAPSHOT.zip
+      -  name: Publish p2 update site
+         if: github.event_name == 'push'
+         env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+         run: |
+            remote="https://x-access-token:$GITHUB_TOKEN@github.com/$GITHUB_REPOSITORY"
+            # The first build creates the branch of the update site.
+            if git ls-remote --exit-code --heads "$remote" update-site > /dev/null; then
+               git clone --depth 1 --branch update-site "$remote" site
+            else
+               git init -b update-site site
+               git -C site remote add origin "$remote"
+            fi
+            rm -rf site/latest
+            mkdir -p site/latest
+            cp -r update-site/org.eclipse.efreeze/target/repository/* site/latest/
+            cd site
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add -A
+            git commit -m "New version of the update site"
+            git push origin update-site

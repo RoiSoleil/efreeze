@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<site>
+   <feature id="org.eclipse.efreeze.feature">
+      <category name="org.eclipse.efreeze"/>
+   </feature>
+   <category-def name="org.eclipse.efreeze" label="EFreeze"/>
+</site>
