@@ -6,6 +6,7 @@ Bundle-SymbolicName: org.eclipse.efreeze.tests
 Bundle-Version: 0.1.0.qualifier
 Fragment-Host: org.eclipse.efreeze
 Require-Bundle: junit-jupiter-api;bundle-version="[5.9.0,6.0.0)",
- org.eclipse.ui.ide.application
+ org.eclipse.ui.ide.application,
+ org.eclipse.ecf.provider.filetransfer.httpclientjava
 Automatic-Module-Name: org.eclipse.efreeze.tests
 Bundle-Vendor: RoiSoleil

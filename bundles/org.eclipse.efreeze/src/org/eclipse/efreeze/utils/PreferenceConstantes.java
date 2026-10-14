@@ -10,6 +10,10 @@ public class PreferenceConstantes {
   public static final String FOLDER = "FOLDER";
   /** The number of reports that are kept: the oldest ones are deleted. */
   public static final String MAX_REPORTS = "MAX_REPORTS";
+  /** Whether the reports of the freezes are shared in public issues on GitHub. */
+  public static final String SHARE = "SHARE";
+  /** The address of the relay that opens the issues. */
+  public static final String RELAY = "RELAY";
 
   public static final int MIN_THRESHOLD = 100;
   public static final int MAX_THRESHOLD = 600_000;

@@ -46,6 +46,15 @@ public class PreferencePage extends FieldEditorPreferencePage implements IWorkbe
     link.setLayoutData(new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1));
     link.setText("<A>Open the folder of the thread dumps</A>");
     link.addSelectionListener(SelectionListener.widgetSelectedAdapter(e -> Program.launch(folder())));
+    addField(new BooleanFieldEditor(SHARE, "&Share the reports of the freezes in public issues on GitHub", parent));
+    Label warning = new Label(parent, SWT.WRAP);
+    GridData warningData = new GridData(SWT.FILL, SWT.CENTER, true, false, 3, 1);
+    warningData.widthHint = 400;
+    warning.setLayoutData(warningData);
+    warning.setText("Each report is sent to a relay that opens an issue on github.com/RoiSoleil/efreeze, without an account. "
+        + "Anyone can read it: it shows the stacks of the threads, so the names of the classes and of the projects, and the paths "
+        + "of the files; the home folder is replaced by ~. The relay opens 20 issues a day at most.");
+    addField(new StringFieldEditor(RELAY, "&Relay : ", parent));
   }
 
   @Override

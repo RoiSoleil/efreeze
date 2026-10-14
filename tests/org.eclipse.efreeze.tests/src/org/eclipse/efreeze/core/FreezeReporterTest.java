@@ -44,6 +44,8 @@ class FreezeReporterTest {
   private boolean closing;
   private boolean probeFails;
   private final List<String> logged = new ArrayList<>();
+  /** The complete reports of the freezes, that may be shared. */
+  private final List<Path> finished = new ArrayList<>();
 
   private final Probe probe = new Probe() {
     @Override
@@ -102,6 +104,11 @@ class FreezeReporterTest {
           @Override
           public void error(String message, Throwable exception) {
             logged.add("error: " + message + " (" + exception.getMessage() + ")");
+          }
+
+          @Override
+          public void finished(Path report) {
+            finished.add(report);
           }
         }, ZoneOffset.ofHours(2));
   }
@@ -225,6 +232,7 @@ class FreezeReporterTest {
     assertEquals(start + same + moved + all + end, Files.readString(finished));
     assertEquals(List.of("freeze-2026-10-14_12-00-00.000-6230ms.txt", "session-2026-10-14_09-00-00.000.txt"), files());
     assertEquals(List.of("warning: The user interface was frozen for 6230 ms. Thread dumps: " + finished), logged);
+    assertEquals(List.of(finished), this.finished, "the complete report may be shared");
 
     // The next freeze has its own report, with counters that start again.
     reporter.responsive();
@@ -261,6 +269,7 @@ class FreezeReporterTest {
     reporter.ended(6000, 0);
     assertEquals(List.of(), files());
     assertEquals(List.of(), logged);
+    assertEquals(List.of(), finished);
 
     // The next one is reported.
     closing = false;
@@ -296,6 +305,7 @@ class FreezeReporterTest {
         Every thread was stopped, the watchdog of EFreeze too: this is not a freeze of the UI thread alone, and the stacks of the threads would tell nothing. The memory of Eclipse (-Xmx) or its garbage collector is what to look at.
         """, Files.readString(pause));
     assertEquals(List.of("warning: Eclipse was paused for about 3200 ms by its garbage collector. Report: " + pause), logged);
+    assertEquals(List.of(), finished, "only the freezes of the UI thread are shared");
     assertNull(reporter.currentReport());
 
     // Before the first look at the UI thread there is nothing to compare with.

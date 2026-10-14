@@ -1,0 +1,10 @@
+{
+  "name": "efreeze-relay",
+  "private": true,
+  "type": "module",
+  "description": "Opens an issue on GitHub for each report of a freeze that EFreeze sends",
+  "scripts": {
+    "test": "node --test",
+    "deploy": "wrangler deploy"
+  }
+}

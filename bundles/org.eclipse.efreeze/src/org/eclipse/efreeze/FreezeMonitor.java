@@ -20,6 +20,8 @@ public class FreezeMonitor {
   private final Settings settings;
   private final FreezeDetector detector;
   private final FreezeReporter reporter;
+  /** Shares the reports on GitHub, if the user wants it. */
+  private final ReportSharer sharer;
   private final Thread thread;
   private volatile boolean stopped;
 
@@ -32,6 +34,18 @@ public class FreezeMonitor {
   public FreezeMonitor(Display display, Settings settings, Instant sessionStart, Supplier<String> session, ILog log) {
     this.display = display;
     this.settings = settings;
+    sharer = settings.relay() == null ? null
+        : new ReportSharer(settings.relay(), ReportSharer.http(EclipseHttp::sharedClient), System.getProperty("user.home"), new ReportSharer.Log() {
+          @Override
+          public void info(String message) {
+            log.info(message);
+          }
+
+          @Override
+          public void warning(String message, Throwable exception) {
+            log.warn(message, exception);
+          }
+        });
     reporter = new FreezeReporter(new ReportFolder(settings.folder(), settings.maxReports()), new JvmProbe(display.getThread()),
         settings.threshold(), sessionStart, session, Instant::now, FreezeMonitor::isClosing, new FreezeReporter.Log() {
           @Override
@@ -42,6 +56,13 @@ public class FreezeMonitor {
           @Override
           public void error(String message, Throwable exception) {
             log.error(message, exception);
+          }
+
+          @Override
+          public void finished(Path report) {
+            if (sharer != null) {
+              sharer.share(report);
+            }
           }
         });
     detector = new FreezeDetector(this::post, System::nanoTime, settings.threshold(), reporter);

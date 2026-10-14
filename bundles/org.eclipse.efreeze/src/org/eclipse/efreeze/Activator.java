@@ -2,6 +2,8 @@ package org.eclipse.efreeze;
 
 import static org.eclipse.efreeze.utils.PreferenceConstantes.*;
 
+import java.net.URI;
+import java.net.URISyntaxException;
 import java.nio.file.InvalidPathException;
 import java.nio.file.Path;
 import java.time.Instant;
@@ -35,6 +37,8 @@ public class Activator extends AbstractUIPlugin {
     }
   };
   private boolean monitoringStarted;
+  /** The address of the relay that the log has told to be wrong. */
+  private String warnedRelay;
 
   /**
    * The constructor
@@ -46,6 +50,7 @@ public class Activator extends AbstractUIPlugin {
   public void start(BundleContext context) throws Exception {
     super.start(context);
     plugin = this;
+    EclipseHttp.open();
     InstanceScope.INSTANCE.getNode(PLUGIN_ID).addPreferenceChangeListener(preferenceListener);
   }
 
@@ -53,6 +58,7 @@ public class Activator extends AbstractUIPlugin {
   public void stop(BundleContext context) throws Exception {
     InstanceScope.INSTANCE.getNode(PLUGIN_ID).removePreferenceChangeListener(preferenceListener);
     stopMonitoring();
+    EclipseHttp.close();
     plugin = null;
     super.stop(context);
   }
@@ -80,6 +86,14 @@ public class Activator extends AbstractUIPlugin {
     Settings settings = settings();
     if (!settings.enabled() || !PlatformUI.isWorkbenchRunning()) {
       return;
+    }
+    IPreferencesService preferences = Platform.getPreferencesService();
+    String relay = preferences.getString(PLUGIN_ID, RELAY, "", null);
+    if (settings.relay() == null && preferences.getBoolean(PLUGIN_ID, SHARE, false, null) && !relay.equals(warnedRelay)) {
+      // Once for an address, not at each change of another preference.
+      warnedRelay = relay;
+      getLog().warn("The reports of the freezes are not shared on GitHub: the address of the relay is not one over HTTPS: "
+          + preferences.getString(PLUGIN_ID, RELAY, "", null));
     }
     if (session == null) {
       sessionStart = Instant.now();
@@ -115,8 +129,23 @@ public class Activator extends AbstractUIPlugin {
     IPreferencesService preferences = Platform.getPreferencesService();
     int threshold = preferences.getInt(PLUGIN_ID, THRESHOLD, PreferenceInitializer.DEFAULT_THRESHOLD, null);
     int maxReports = preferences.getInt(PLUGIN_ID, MAX_REPORTS, PreferenceInitializer.DEFAULT_MAX_REPORTS, null);
+    URI relay = preferences.getBoolean(PLUGIN_ID, SHARE, false, null)
+        ? relay(preferences.getString(PLUGIN_ID, RELAY, PreferenceInitializer.DEFAULT_RELAY, null))
+        : null;
     return new Settings(preferences.getBoolean(PLUGIN_ID, ENABLED, true, null), Math.max(MIN_THRESHOLD, Math.min(MAX_THRESHOLD, threshold)),
-        folder(preferences.getString(PLUGIN_ID, FOLDER, "", null)), Math.max(1, maxReports));
+        folder(preferences.getString(PLUGIN_ID, FOLDER, "", null)), Math.max(1, maxReports), relay);
+  }
+
+  /**
+   * @return the address of the relay, or {@code null} if it is not an address over HTTPS
+   */
+  static URI relay(String preference) {
+    try {
+      URI relay = new URI(preference == null ? "" : preference.trim());
+      return "https".equals(relay.getScheme()) && relay.getHost() != null ? relay : null;
+    } catch (URISyntaxException e) {
+      return null;
+    }
   }
 
   /**

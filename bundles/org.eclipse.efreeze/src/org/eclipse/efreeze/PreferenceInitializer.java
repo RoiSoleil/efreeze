@@ -8,6 +8,7 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
 
   public static final int DEFAULT_THRESHOLD = 1000;
   public static final int DEFAULT_MAX_REPORTS = 100;
+  public static final String DEFAULT_RELAY = "https://efreeze-relay.efreeze-relay.workers.dev/reports";
 
   @Override
   public void initializeDefaultPreferences() {
@@ -16,6 +17,8 @@ public class PreferenceInitializer extends AbstractPreferenceInitializer {
     preferences.putInt(THRESHOLD, DEFAULT_THRESHOLD);
     preferences.put(FOLDER, "");
     preferences.putInt(MAX_REPORTS, DEFAULT_MAX_REPORTS);
+    preferences.putBoolean(SHARE, false);
+    preferences.put(RELAY, DEFAULT_RELAY);
   }
 
 }

@@ -25,6 +25,12 @@ public class FreezeReporter implements FreezeDetector.Listener {
     void warning(String message);
 
     void error(String message, Throwable exception);
+
+    /**
+     * Tells that the report of a freeze is complete: the UI thread answers again.
+     */
+    default void finished(Path report) {
+    }
   }
 
   private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss.SSS xxx");
@@ -199,6 +205,7 @@ public class FreezeReporter implements FreezeDetector.Listener {
       folder.append(ended, text.toString());
       ended = folder.finish(ended, durationMillis);
       log.warning("The user interface was frozen for " + durationMillis + " ms. Thread dumps: " + ended);
+      log.finished(ended);
     } catch (IOException | RuntimeException e) {
       failed(e);
     }

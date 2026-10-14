@@ -29,6 +29,13 @@ There is nothing to set up: EFreeze starts with Eclipse, in every workspace.
 - **The versions** of Eclipse, of Java, of the system and of every plug-in, in one `session-*.txt` file by session of
   Eclipse: they lead to the sources of the frames of the stacks.
 - A line in the *Error Log* once Eclipse answers again, with the path of the report.
+- **Sharing the reports on GitHub**, off by default: in *Window > Preferences > EFreeze*, each report of a freeze is
+  then sent, once Eclipse answers again, to a [relay](relay/README.md) that opens a public issue for it in this
+  repository; no account on GitHub is needed. Anyone can read these issues: the stacks show the names of the classes, of
+  the projects and the paths of the files (the home folder is replaced by `~`). The relay opens 20 issues a day at most.
+  The report goes through the HTTP transport of Eclipse (ECF) and its proxies (*General > Network Connections*); the
+  HTTP client of Java does not authenticate with Basic to a proxy over HTTPS, unless Eclipse is started with
+  `-Djdk.http.auth.tunneling.disabledSchemes=`.
 - The 100 newest reports are kept. The threshold, the folder and the number of reports are in
   *Window > Preferences > EFreeze*; the detection can be turned off there.
 

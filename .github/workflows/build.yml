@@ -28,6 +28,9 @@ jobs:
            key: ${{ runner.os }}-maven-${{ hashFiles('**/pom.xml') }}
            restore-keys: |
              ${{ runner.os }}-maven-
+      -  name: Test the relay
+         run: npm test
+         working-directory: relay
       -  name: Build
          # The tests freeze the UI thread of a real workbench: they need a display.
          run: xvfb-run -a mvn -B clean install

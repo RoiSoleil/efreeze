@@ -7,7 +7,9 @@ Bundle-Version: 0.1.0.qualifier
 Bundle-Activator: org.eclipse.efreeze.Activator
 Bundle-Localization: plugin
 Require-Bundle: org.eclipse.ui,
- org.eclipse.core.runtime
+ org.eclipse.core.runtime,
+ org.eclipse.core.net
+Import-Package: org.eclipse.ecf.internal.provider.filetransfer.httpclientjava;resolution:=optional
 Automatic-Module-Name: org.eclipse.efreeze
 Bundle-ActivationPolicy: lazy
 Bundle-Vendor: %pluginProvider
