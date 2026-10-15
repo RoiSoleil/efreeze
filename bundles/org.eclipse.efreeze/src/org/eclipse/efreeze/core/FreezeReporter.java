@@ -54,6 +54,8 @@ public class FreezeReporter implements FreezeDetector.Listener {
   /** The UI thread when it was looked at last, and when. */
   private ThreadStack lastUi;
   private long lastUiAt;
+  /** The UI thread has been in the event loop of SWT at each look at the freeze that is going on. */
+  private boolean inEventLoop;
   /** An error is logged once, not at each look at a freeze. */
   private boolean failed;
 
@@ -113,6 +115,7 @@ public class FreezeReporter implements FreezeDetector.Listener {
         ignoring = true;
         return;
       }
+      inEventLoop = true;
       Instant start = now.get().minusMillis(elapsedMillis);
       StringBuilder text = new StringBuilder("UI freeze of Eclipse, seen by EFreeze\n");
       text.append("Start: ").append(TIME.withZone(zone).format(start)).append('\n');
@@ -139,6 +142,8 @@ public class FreezeReporter implements FreezeDetector.Listener {
     try {
       folder.append(report, section(elapsedMillis, allThreads ? probe.allThreads() : probe.uiThread(), allThreads));
     } catch (IOException | RuntimeException e) {
+      // a look that failed tells nothing of the UI thread
+      inEventLoop = false;
       failed(e);
     }
   }
@@ -155,6 +160,7 @@ public class FreezeReporter implements FreezeDetector.Listener {
     text.append("CPU time of the UI thread since the start: ").append(cpu(counters)).append('\n');
     text.append("Garbage collection since the start: ").append(counters.gcSince(baseline)).append('\n');
     ThreadStack ui = dump.thread(uiId);
+    inEventLoop &= ui != null && ThreadDumps.inEventLoop(ui);
     if (allThreads) {
       text.append("Heap: ").append(probe.heap()).append('\n');
       if (!dump.deadlocked().isEmpty()) {
@@ -195,17 +201,31 @@ public class FreezeReporter implements FreezeDetector.Listener {
     report = null;
     try {
       Counters counters = probe.counters();
+      long cpu = counters.uiCpuSince(baseline);
       StringBuilder text = new StringBuilder("\n=== End ===\n");
       text.append("The UI thread answered again after ").append(durationMillis).append(" ms.\n");
-      text.append("CPU time of the UI thread during the freeze: ").append(cpu(counters)).append('\n');
+      text.append("CPU time of the UI thread during the freeze: ").append(cpu < 0 ? "unknown" : cpu + " ms").append('\n');
       text.append("Garbage collection during the freeze: ").append(counters.gcSince(baseline)).append('\n');
       if (pausedMillis > 0) {
         text.append("The whole virtual machine was paused during about ").append(pausedMillis).append(" ms of the freeze.\n");
       }
+      // Eclipse computes in the UI thread, or waits for a lock: the windowing system made it wait, if it did neither. The
+      // processor time of the UI thread does not grow while the whole virtual machine is paused.
+      boolean windowing = inEventLoop && cpu >= 0 && cpu * 2 < durationMillis - pausedMillis;
+      if (windowing) {
+        text.append("The UI thread waited for the windowing system, not for Eclipse: at each look it was in the event loop of the"
+            + " workbench, with only the widgets of SWT above it, and it used ").append(cpu).append(" ms of processor. Something out of Eclipse made it wait,"
+                + " e.g. a change of the screens, a session locked or shared, or a tool that moves the windows. This report is not shared.\n");
+      }
       folder.append(ended, text.toString());
       ended = folder.finish(ended, durationMillis);
-      log.warning("The user interface was frozen for " + durationMillis + " ms. Thread dumps: " + ended);
-      log.finished(ended);
+      if (windowing) {
+        log.warning("The user interface did not answer for " + durationMillis + " ms, waiting for the windowing system, not for Eclipse."
+            + " Thread dumps: " + ended);
+      } else {
+        log.warning("The user interface was frozen for " + durationMillis + " ms. Thread dumps: " + ended);
+        log.finished(ended);
+      }
     } catch (IOException | RuntimeException e) {
       failed(e);
     }

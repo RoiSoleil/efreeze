@@ -223,4 +223,32 @@ class ThreadDumpsTest {
       mine.unlock();
     }
   }
+
+  @Test
+  void threadInTheEventLoopOfSwtOnly() {
+    StackTraceElement loop = frame("org.eclipse.swt.widgets.Display", "readAndDispatch", 3744);
+    StackTraceElement workbench = frame("org.eclipse.e4.ui.internal.workbench.swt.PartRenderingEngine$5", "run", 1160);
+
+    assertTrue(ThreadDumps.inEventLoop(running(1, "main", frame("org.eclipse.swt.internal.win32.OS", "PeekMessage", -2), loop, workbench)));
+    assertTrue(ThreadDumps.inEventLoop(running(1, "main", frame("org.eclipse.swt.internal.win32.OS", "GetWindowPlacement", -2),
+        frame("org.eclipse.swt.widgets.Shell", "WM_MOVE", 2659), frame("org.eclipse.swt.internal.win32.OS", "PeekMessage", -2), loop, workbench)),
+        "SWT handles a message of the windowing system");
+    assertTrue(ThreadDumps.inEventLoop(running(1, "main", frame("org.eclipse.swt.internal.win32.OS", "WaitMessage", -2),
+        frame("org.eclipse.swt.widgets.Display", "sleep", 4600), workbench)));
+    assertFalse(ThreadDumps.inEventLoop(running(1, "main", frame("org.demo.Editor", "save", 10), frame("org.eclipse.swt.widgets.Display",
+        "runAsyncMessages", 4136), loop, workbench)), "code of a plug-in");
+    assertFalse(ThreadDumps.inEventLoop(running(1, "main", frame("org.eclipse.swt.internal.win32.OS", "PeekMessage", -2))), "no event loop");
+    assertFalse(ThreadDumps.inEventLoop(running(1, "main", frame("org.eclipse.swt.internal.win32.OS", "WaitMessage", -2),
+        frame("org.eclipse.swt.widgets.Display", "sleep", 4600), frame("org.demo.Waiter", "waitFor", 12), workbench)),
+        "an event loop of a plug-in, which may wait for ever");
+    assertFalse(ThreadDumps.inEventLoop(running(1, "main", frame("org.eclipse.swt.internal.win32.OS", "PeekMessage", -2), loop,
+        frame("org.eclipse.jface.window.Window", "runEventLoop", 777), workbench)), "the event loop of a dialog");
+    assertFalse(ThreadDumps.inEventLoop(running(1, "main", frame("org.eclipse.swt.graphics.TextLayout", "draw", 900),
+        frame("org.eclipse.swt.custom.StyledText", "handlePaint", 6000), frame("org.eclipse.swt.widgets.Composite", "WM_PAINT", 1537), loop,
+        workbench)), "SWT computes what Eclipse gave it");
+    assertFalse(ThreadDumps.inEventLoop(blocked(1, "main", "java.lang.Object@1a", 7, "Worker-1", frame("org.eclipse.swt.widgets.Synchronizer",
+        "removeFirst", 90), frame("org.eclipse.swt.widgets.Display", "runAsyncMessages", 4136), loop, workbench)),
+        "another thread holds a lock of Java");
+    assertFalse(ThreadDumps.inEventLoop(running(1, "main")));
+  }
 }

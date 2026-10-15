@@ -39,6 +39,12 @@ There is nothing to set up: EFreeze starts with Eclipse, in every workspace.
 - The 100 newest reports are kept. The threshold, the folder and the number of reports are in
   *Window > Preferences > EFreeze*; the detection can be turned off there.
 
+A UI thread that waits for the windowing system, not for Eclipse, is told apart: at each look it runs in the event loop
+of the workbench with only the widgets of SWT above it, and it uses less than half of the time of the freeze in
+processor. Something out of Eclipse made
+it wait (a change of the screens, a session locked or shared, a tool that moves the windows): its report says so, the
+*Error Log* too, and it is not shared on GitHub.
+
 A pause of the whole Java virtual machine (the watchdog of EFreeze is paused too) is not a freeze of the UI thread:
 it is reported in a `gc-pause-*.txt` file when the garbage collector explains it, and ignored otherwise (a computer
 that was suspended). A UI thread suspended by a debugger and an Eclipse that closes are not reported either.

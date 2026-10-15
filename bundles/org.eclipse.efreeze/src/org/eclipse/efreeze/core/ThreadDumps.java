@@ -186,6 +186,33 @@ public class ThreadDumps {
     return text.toString();
   }
 
+  /**
+   * @return {@code true} if the thread runs in the event loop of the workbench with only the widgets of SWT and their calls
+   *         to the windowing system above it: it waits for the windowing system, or SWT handles a message of it. A nested
+   *         event loop, e.g. of a dialog or of a plug-in, is not the one of the workbench.
+   */
+  public static boolean inEventLoop(ThreadStack thread) {
+    if (thread.state() != Thread.State.RUNNABLE) {
+      // a lock of Java: another thread makes it wait
+      return false;
+    }
+    List<StackTraceElement> frames = thread.frames();
+    for (int i = 0; i < frames.size(); i++) {
+      StackTraceElement frame = frames.get(i);
+      if ("org.eclipse.swt.widgets.Display".equals(frame.getClassName())
+          && ("readAndDispatch".equals(frame.getMethodName()) || "sleep".equals(frame.getMethodName()))) {
+        return i + 1 < frames.size() && frames.get(i + 1).getClassName().startsWith(WORKBENCH_LOOP);
+      }
+      if (!frame.getClassName().startsWith("org.eclipse.swt.widgets.") && !frame.getClassName().startsWith("org.eclipse.swt.internal.")) {
+        return false;
+      }
+    }
+    return false;
+  }
+
+  /** The class whose method runs the event loop of the workbench. */
+  private static final String WORKBENCH_LOOP = "org.eclipse.e4.ui.internal.workbench.swt.PartRenderingEngine$";
+
   private static boolean isOfJava(StackTraceElement frame) {
     String type = frame.getClassName();
     return type.startsWith("java.") || type.startsWith("javax.") || type.startsWith("jdk.") || type.startsWith("sun.");

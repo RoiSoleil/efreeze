@@ -248,6 +248,86 @@ class FreezeReporterTest {
     assertEquals(3, files().size(), "one session for both");
   }
 
+  /** The UI thread in the event loop of SWT, in a function of the windowing system. */
+  private static ThreadStack inEventLoop(String function) {
+    return running(1, "main", frame("org.eclipse.swt.internal.win32.OS", function, -2), frame("org.eclipse.swt.widgets.Display", "readAndDispatch", 3744),
+        frame("org.eclipse.e4.ui.internal.workbench.swt.PartRenderingEngine$5", "run", 1160));
+  }
+
+  @Test
+  void freezeOfTheWindowingSystemIsToldAndNotShared() throws IOException {
+    ui = inEventLoop("PeekMessage");
+    reporter.responsive();
+    reporter.started(1000);
+    uiCpu += 30;
+    ui = inEventLoop("EndBufferedPaint");
+    reporter.observed(1500, false);
+    uiCpu += 40;
+    reporter.ended(3750, 0);
+
+    Path report = reports.resolve("freeze-2026-10-14_12-00-00.012-3750ms.txt");
+    assertTrue(Files.readString(report).endsWith("""
+        The UI thread waited for the windowing system, not for Eclipse: at each look it was in the event loop of the workbench, with only the widgets of SWT above it, and it used 70 ms of processor. Something out of Eclipse made it wait, e.g. a change of the screens, a session locked or shared, or a tool that moves the windows. This report is not shared.
+        """), Files.readString(report));
+    assertEquals(List.of("warning: The user interface did not answer for 3750 ms, waiting for the windowing system, not for Eclipse. Thread dumps: "
+        + report), logged);
+    assertEquals(List.of(), finished, "not shared");
+  }
+
+  @Test
+  void freezeInTheEventLoopWithCodeOfEclipseIsAFreeze() throws IOException {
+    ui = inEventLoop("PeekMessage");
+    reporter.responsive();
+    reporter.started(1000);
+    // the UI thread runs code of a plug-in at one look
+    ui = running(1, "main", frame("org.demo.Editor", "save", 10), frame("org.eclipse.swt.widgets.Display", "readAndDispatch", 3744));
+    reporter.observed(1500, false);
+    ui = inEventLoop("PeekMessage");
+    reporter.ended(3000, 0);
+
+    assertEquals(1, finished.size());
+    assertFalse(Files.readString(finished.get(0)).contains("windowing system"));
+  }
+
+  @Test
+  void pauseOfTheVirtualMachineDoesNotMakeAFreezeOfTheWindowingSystem() throws IOException {
+    ui = inEventLoop("DispatchMessage");
+    reporter.responsive();
+    reporter.started(1000);
+    // 1600 ms of processor in 2000 ms of work, and a pause of 2500 ms of the whole virtual machine
+    uiCpu += 1600;
+    reporter.ended(4500, 2500);
+
+    assertEquals(1, finished.size());
+    assertFalse(Files.readString(finished.get(0)).contains("windowing system"));
+  }
+
+  @Test
+  void failedLookIsNoLookInTheEventLoop() throws IOException {
+    ui = inEventLoop("PeekMessage");
+    reporter.responsive();
+    reporter.started(1000);
+    probeFails = true;
+    reporter.observed(1500, true);
+    probeFails = false;
+    reporter.ended(3000, 0);
+
+    assertEquals(1, finished.size());
+  }
+
+  @Test
+  void busyEventLoopIsAFreeze() throws IOException {
+    ui = inEventLoop("DispatchMessage");
+    reporter.responsive();
+    reporter.started(1000);
+    // SWT handles many messages: the processor is busy
+    uiCpu += 1600;
+    reporter.ended(3000, 0);
+
+    assertEquals(1, finished.size());
+    assertFalse(Files.readString(finished.get(0)).contains("windowing system"));
+  }
+
   @Test
   void suspendedUiThreadOrClosingEclipseIsNoFreezeToReport() throws IOException {
     // A breakpoint of a debugger in the UI thread.
